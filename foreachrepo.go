@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/transcovo/foreachrepo/foreachrepo"
+	"github.com/transcovo/foreachrepo/repos_explorator"
 	"net/http"
 )
 
 func main() {
-	foreachrepo.GetReposList(http.DefaultClient, "transcovo")
+	repos_explorator.GetReposList(http.DefaultClient, "transcovo")
 }

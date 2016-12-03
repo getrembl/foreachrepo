@@ -1,4 +1,4 @@
-package foreachrepo
+package repos_explorator
 
 import (
 	"net/http"
