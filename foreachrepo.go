@@ -1,7 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"github.com/transcovo/foreachrepo/foreachrepo"
+	"net/http"
+)
 
 func main() {
-	fmt.Println("Hello")
+	foreachrepo.GetReposList(http.DefaultClient, "transcovo")
 }
