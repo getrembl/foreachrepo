@@ -5,33 +5,59 @@ import (
 	"os/exec"
 )
 
-func IsGitInstalled() bool {
-	cmd := exec.Command("git", "--version")
-	clone_start_err := cmd.Start()
-	if clone_start_err != nil {
-		return false
-	}
-	clone_end_err := cmd.Wait()
-	if clone_end_err != nil {
-		return false
-	}
-	return true
+type Executor struct {
+	dir string
 }
 
-func CloneRepo(url string) (string, error) {
-	dir, mkdir_err := ioutil.TempDir("", "")
-	if mkdir_err != nil {
-		return "", mkdir_err
+func (E *Executor) Exec(name string, elements ...string) error {
+	cmd := exec.Command(name, elements...)
+	if E.dir != "" {
+		cmd.Dir = E.dir
+	}
+	start_err := cmd.Start()
+	if start_err != nil {
+		return start_err
+	}
+	wait_err := cmd.Wait()
+	if wait_err != nil {
+		return wait_err
+	}
+	return nil
+}
+
+func ExecCommand(dir string, name string, elements ...string) error {
+	executor := &Executor{dir}
+	return executor.Exec(name, elements...)
+}
+
+func IsGitInstalled() bool {
+	return ExecCommand("", "git", "--version") == nil
+}
+
+func Clone(url string) (string, error) {
+	dir, mkdirErr := ioutil.TempDir("", "")
+	if mkdirErr != nil {
+		return "", mkdirErr
 	}
 
-	cmd := exec.Command("git", "clone", url, dir)
-	clone_start_err := cmd.Start()
-	if clone_start_err != nil {
-		return "", clone_start_err
-	}
-	clone_end_err := cmd.Wait()
-	if clone_end_err != nil {
-		return "", clone_end_err
+	gitErr := ExecCommand(dir, "git", "clone", url, dir)
+	if gitErr != nil {
+		return "", gitErr
 	}
 	return dir, nil
+}
+
+func CommitAndPushInNewBranch(dir string, branch string, message string) error {
+	executor := &Executor{dir}
+	err := executor.Exec("git", "checkout", "-b", branch)
+	if err == nil {
+		err = executor.Exec("git", "add", ".")
+	}
+	if err == nil {
+		err = executor.Exec("git", "commit", "-m", message)
+	}
+	if err == nil {
+		err = executor.Exec("git", "push", "-u", "origin", branch)
+	}
+	return err
 }
