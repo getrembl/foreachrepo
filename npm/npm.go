@@ -3,6 +3,9 @@ package npm
 import (
 	"regexp"
 	"strings"
+	"io/ioutil"
+	"path/filepath"
+	"os"
 )
 
 const SPACES = "\\s*"
@@ -44,7 +47,7 @@ func (D *InvalidPackageJsonContent) Error() string {
 	return "Invalid package.json content " + D.packageContent
 }
 
-func UpdateDependencyVersion(packageContent string, dependency string, version string) (string, error) {
+func GetUpdatedPackageContent(packageContent string, dependency string, version string) (string, error) {
 	elements := []string{
 		SPACES,
 		quote(group(regexp.QuoteMeta(dependency))),
@@ -74,4 +77,43 @@ func UpdateDependencyVersion(packageContent string, dependency string, version s
 	default:
 		return "", &InvalidPackageJsonContent{packageContent, dependency}
 	}
+}
+
+// Exists reports whether the named file or directory exists.
+func exists(name string) bool {
+    if _, err := os.Stat(name); err != nil {
+    if os.IsNotExist(err) {
+                return false
+            }
+    }
+    return true
+}
+
+type NoPackageJson struct {
+	dir string
+}
+
+func (D *NoPackageJson) Error() string {
+	return "No package.json found in " + D.dir
+}
+
+func UpdatePackage(dir string, dependency string, version string) error {
+	packageFile := filepath.Join(dir, "package.json")
+	if !exists(packageFile) {
+		return &NoPackageJson{dir}
+	}
+	bytes, err := ioutil.ReadFile(packageFile)
+	if err != nil {
+		return err
+	}
+	packageContent := string(bytes)
+	updatedPackageContent, err := GetUpdatedPackageContent(packageContent, dependency, version)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(packageFile, []byte(updatedPackageContent), 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }

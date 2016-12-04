@@ -3,9 +3,12 @@ package npm
 import (
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"io/ioutil"
+	"path/filepath"
+	"os"
 )
 
-const samplePackageContent = `{
+const SAMPLE_PACKAGE_CONTENT = `{
   "name": "express-middleware",
   "version": "1.4.0",
   "description": "Set of middlewares for Chauffeur-Privé",
@@ -44,10 +47,7 @@ const samplePackageContent = `{
 }
 `
 
-func TestUpdateDependencyVersionSuccess(t *testing.T) {
-	updated, err := UpdateDependencyVersion(samplePackageContent, "bunyan", "1.8.2")
-	assert.Nil(t, err)
-	expectedUpdated := `{
+const EXPECTED_UPDATED_PACKAGE_CONTENT = `{
   "name": "express-middleware",
   "version": "1.4.0",
   "description": "Set of middlewares for Chauffeur-Privé",
@@ -85,11 +85,15 @@ func TestUpdateDependencyVersionSuccess(t *testing.T) {
   "license": "Apache-2.0"
 }
 `
-	assert.Equal(t, expectedUpdated, updated)
+
+func TestGetUpdatedPackageContentSuccess(t *testing.T) {
+	updated, err := GetUpdatedPackageContent(SAMPLE_PACKAGE_CONTENT, "bunyan", "1.8.2")
+	assert.Nil(t, err)
+	assert.Equal(t, EXPECTED_UPDATED_PACKAGE_CONTENT, updated)
 }
 
-func TestUpdateDependencyVersionNotFound(t *testing.T) {
-	updated, err := UpdateDependencyVersion(samplePackageContent, "not-a-dependency", "1.8.2")
+func TestGetUpdatedPackageContentNotFound(t *testing.T) {
+	updated, err := GetUpdatedPackageContent(SAMPLE_PACKAGE_CONTENT, "not-a-dependency", "1.8.2")
 	assert.Equal(t, "", updated)
 	assert.NotNil(t, err)
 	errMessage := err.Error()
@@ -97,11 +101,32 @@ func TestUpdateDependencyVersionNotFound(t *testing.T) {
 	assert.Contains(t, errMessage, "not found")
 }
 
-func TestUpdateDependencyVersionUpToDate(t *testing.T) {
-	updated, err := UpdateDependencyVersion(samplePackageContent, "bunyan", "~1.8.1")
+func TestGetUpdatedPackageContentUpToDate(t *testing.T) {
+	updated, err := GetUpdatedPackageContent(SAMPLE_PACKAGE_CONTENT, "bunyan", "~1.8.1")
 	assert.Equal(t, "", updated)
 	assert.NotNil(t, err)
 	errMessage := err.Error()
 	assert.Contains(t, errMessage, "bunyan")
 	assert.Contains(t, errMessage, "up to date")
+}
+
+func TestUpdatePackage(t *testing.T) {
+	dir, mkdir_err := ioutil.TempDir("", "")
+	if mkdir_err != nil {
+		panic(mkdir_err)
+	}
+	defer os.RemoveAll(dir)
+	packageFile := filepath.Join(dir, "package.json")
+	fileWriteErr := ioutil.WriteFile(packageFile, []byte(SAMPLE_PACKAGE_CONTENT), 0644)
+	if fileWriteErr != nil {
+		panic(fileWriteErr)
+	}
+	updateErr := UpdatePackage(dir, "bunyan", "1.8.2")
+	assert.Nil(t, updateErr)
+	bytes, err := ioutil.ReadFile(packageFile)
+	if err != nil {
+		panic(err)
+	}
+	updatedPackageContent := string(bytes)
+	assert.Equal(t, EXPECTED_UPDATED_PACKAGE_CONTENT, updatedPackageContent)
 }
