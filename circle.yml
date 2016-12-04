@@ -1,0 +1,5 @@
+machine:
+  pre:
+    - sudo apt-get update; sudo apt-get install git ssh
+    - git config --global user.name "CircleCi Tests"
+    - git config --global user.email email@org
