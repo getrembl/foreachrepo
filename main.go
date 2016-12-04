@@ -12,8 +12,8 @@ import (
 
 const EXAMPLE = `. Example:
 
-foreach_repo_bump_npm_dep -org transcovo -npm-dep chpr-metric -npm-dep-ver 1.0.0` +
-	` -branch fixed-chpr-metrics-version -message "TECH Use fixed version for chpr-metric"
+foreachrepo -org transcovo -npm-dep chpr-metrics -npm-dep-ver 1.0.0` +
+	` -branch fixed-chpr-metrics-version -message "TECH Use fixed version for chpr-metrics"
 `
 
 func main() {
