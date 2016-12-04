@@ -1,5 +1,10 @@
 machine:
   pre:
-    - sudo apt-get update; sudo apt-get install git ssh
+    - sudo apt-get update; sudo apt-get install git
     - git config --global user.name "CircleCi Tests"
     - git config --global user.email email@org
+test:
+  override:
+    - bash test.sh
+  post:
+    - bash <(curl -s https://codecov.io/bash)
