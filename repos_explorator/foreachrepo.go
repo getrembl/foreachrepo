@@ -23,6 +23,20 @@ type HttpGetter interface {
 	Get(url string) (resp *http.Response, err error)
 }
 
+type AuthHttpGetter struct {
+	Username string
+	Password string
+}
+
+func (A *AuthHttpGetter) Get(url string) (resp *http.Response, err error) {
+	req, err := http.NewRequest("GET", url, nil)
+	req.SetBasicAuth(A.Username, A.Password)
+	if err != nil {
+		return nil, err
+	}
+	return http.DefaultClient.Do(req)
+}
+
 type githubApiRepoDescription struct {
 	Name    string
 	Ssh_url string
@@ -30,6 +44,8 @@ type githubApiRepoDescription struct {
 
 func getJson(httpGetter HttpGetter, url string, target interface{}) error {
 	r, err := httpGetter.Get(url)
+
+
 	if err != nil {
 		return err
 	}

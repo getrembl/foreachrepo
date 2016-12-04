@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/transcovo/foreachrepo/repos_explorator"
-	"net/http"
 	"github.com/transcovo/foreachrepo/git"
 	"log"
 	"os"
@@ -19,6 +18,16 @@ foreach_repo_bump_npm_dep -org transcovo -npm-dep chpr-metric -npm-dep-ver 1.0.0
 func main() {
 	if !git.IsGitInstalled() {
 		log.Fatal("git command not found")
+	}
+
+	githubUsername := os.Getenv("GITHUB_USERNAME")
+	if githubUsername == "" {
+		log.Fatalln("Missing environement variable GITHUB_USERNAME")
+	}
+
+	githubPassword := os.Getenv("GITHUB_PASSWORD")
+	if githubPassword == "" {
+		log.Fatalln("Missing environement variable GITHUB_PASSWORD")
 	}
 
 	organization := flag.String("org", "REQUIRED", "The organization to scan")
@@ -45,7 +54,9 @@ func main() {
 		log.Fatalln("commitMessage flag required", EXAMPLE)
 	}
 
-	repos, err := repos_explorator.GetReposList(http.DefaultClient, *organization)
+	getter := &repos_explorator.AuthHttpGetter{githubUsername, githubPassword}
+
+	repos, err := repos_explorator.GetReposList(getter, *organization)
 	if err != nil {
 		panic(err)
 	}
