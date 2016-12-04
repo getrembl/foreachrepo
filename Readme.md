@@ -1,5 +1,5 @@
 [![CircleCI](https://circleci.com/gh/transcovo/foreachrepo.svg?style=shield)](https://circleci.com/gh/transcovo/foreachrepo)
-[![Coverage Status](https://coveralls.io/repos/github/transcovo/foreachrepo/badge.svg?branch=master)](https://coveralls.io/github/transcovo/foreachrepo?branch=master)
+[![Coverage Status](https://img.shields.io/codecov/c/github/transcovo/foreachrepo.svg)](https://codecov.io/gh/transcovo/foreachrepo)
 
 ## Overview
 
