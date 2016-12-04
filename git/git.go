@@ -3,6 +3,7 @@ package git
 import (
 	"io/ioutil"
 	"os/exec"
+	"log"
 )
 
 type Executor struct {
@@ -35,6 +36,7 @@ func IsGitInstalled() bool {
 }
 
 func Clone(url string) (string, error) {
+	log.Println("Cloning repo ", url)
 	dir, mkdirErr := ioutil.TempDir("", "")
 	if mkdirErr != nil {
 		return "", mkdirErr

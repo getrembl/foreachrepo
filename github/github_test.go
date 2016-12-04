@@ -1,10 +1,11 @@
-package repos_explorator
+package github
 
 import (
 	"testing"
 	"net/http"
 	"errors"
 	"bytes"
+	"github.com/stretchr/testify/assert"
 )
 
 type TestHttpGetterError struct{}
@@ -53,18 +54,22 @@ func TestGetReposError(t *testing.T) {
 func TestGetReposSuccess(t *testing.T) {
 	page1 := `[{
 		"name": "repo1",
-		"ssh_url": "git@github.com:org/repo1.git"
+		"ssh_url": "git@github.com:org/repo1.git",
+		"pulls_url": "http://api.github.com/repos/org/repo1/pulls{/number}"
 	}, {
 		"name": "repo2",
-		"ssh_url": "git@github.com:org/repo2.git"
+		"ssh_url": "git@github.com:org/repo2.git",
+		"pulls_url": "http://api.github.com/repos/org/repo2/pulls{/number}"
 	}]`
 
 	page2 := `[{
 		"name": "repo3",
-		"ssh_url": "git@github.com:org/repo3.git"
+		"ssh_url": "git@github.com:org/repo3.git",
+		"pulls_url": "http://api.github.com/repos/org/repo3/pulls{/number}"
 	}, {
 		"name": "repo4",
-		"ssh_url": "git@github.com:org/repo4.git"
+		"ssh_url": "git@github.com:org/repo4.git",
+		"pulls_url": "http://api.github.com/repos/org/repo4/pulls{/number}"
 	}]`
 
 	page3 := "[]"
@@ -77,22 +82,21 @@ func TestGetReposSuccess(t *testing.T) {
 
 	getter := &TestHttpGetterSuccess{responses: responses}
 	repos, err := GetReposList(getter, "org")
-	if err != nil {
-		t.Error("Expected no err, got err.Error()=", err.Error())
-	}
-	if len(repos) != 4 {
-		t.Error("Expected len(repos) to be 4, got ", len(repos))
-	}
-	if repos[0].GitUrl != "git@github.com:org/repo1.git" {
-		t.Error("Expected repos[0].GitUrl to be git@github.com:org/repo1.git, got ", repos[0].GitUrl)
-	}
-	if repos[1].GitUrl != "git@github.com:org/repo2.git" {
-		t.Error("Expected repos[1].GitUrl to be git@github.com:org/repo2.git, got ", repos[1].GitUrl)
-	}
-	if repos[2].GitUrl != "git@github.com:org/repo3.git" {
-		t.Error("Expected repos[2].GitUrl to be git@github.com:org/repo3.git, got ", repos[2].GitUrl)
-	}
-	if repos[3].GitUrl != "git@github.com:org/repo4.git" {
-		t.Error("Expected repos[3].GitUrl to be git@github.com:org/repo4.git, got ", repos[3].GitUrl)
-	}
+	assert.Nil(t, err)
+	assert.Len(t, repos, 4)
+	assert.Equal(t, "git@github.com:org/repo1.git", repos[0].GitUrl)
+	assert.Equal(t, "repo1", repos[0].Name)
+	assert.Equal(t, "http://api.github.com/repos/org/repo1/pulls", repos[0].PullsUrl)
+	
+	assert.Equal(t, "git@github.com:org/repo2.git", repos[1].GitUrl)
+	assert.Equal(t, "repo2", repos[1].Name)
+	assert.Equal(t, "http://api.github.com/repos/org/repo2/pulls", repos[1].PullsUrl)
+	
+	assert.Equal(t, "git@github.com:org/repo3.git", repos[2].GitUrl)
+	assert.Equal(t, "repo3", repos[2].Name)
+	assert.Equal(t, "http://api.github.com/repos/org/repo3/pulls", repos[2].PullsUrl)
+	
+	assert.Equal(t, "git@github.com:org/repo4.git", repos[3].GitUrl)
+	assert.Equal(t, "repo4", repos[3].Name)
+	assert.Equal(t, "http://api.github.com/repos/org/repo4/pulls", repos[3].PullsUrl)
 }
