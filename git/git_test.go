@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"strings"
 	"sort"
+	"os/exec"
+	"errors"
 )
 
 func tempDir() string {
@@ -21,23 +23,23 @@ func tempDir() string {
 func makeRepo() (dir string, origin string) {
 	dir = tempDir()
 	origin = tempDir()
-	executor := &Executor{dir}
-	executor.Exec("git", "init")
-	executor.Exec("git", "init", "--bare", origin)
-	executor.Exec("git", "remote", "add", "origin", origin)
+	g := Git(dir)
+	g.Exec("git", "init")
+	g.Exec("git", "init", "--bare", origin)
+	g.Exec("git", "remote", "add", "origin", origin)
 
-	executor.Exec("touch", "file1.txt")
-	executor.Exec("git", "add", ".")
-	executor.Exec("git", "commit", "-m", `"Initial commit"`)
-	executor.Exec("git", "push", "-u", "origin", "master")
+	g.Exec("touch", "file1.txt")
+	g.Exec("git", "add", ".")
+	g.Exec("git", "commit", "-m", `"Initial commit"`)
+	g.Exec("git", "push", "-u", "origin", "master")
 
-	executor.Exec("git", "checkout", "-b", "a-branch")
-	executor.Exec("touch", "file2.txt")
-	executor.Exec("git", "add", ".")
-	executor.Exec("git", "commit", "-m", `"Add a file"`)
-	executor.Exec("git", "push", "-u", "origin", "a-branch")
+	g.Exec("git", "checkout", "-b", "a-branch")
+	g.Exec("touch", "file2.txt")
+	g.Exec("git", "add", ".")
+	g.Exec("git", "commit", "-m", `"Add a file"`)
+	g.Exec("git", "push", "-u", "origin", "a-branch")
 
-	executor.Exec("git", "checkout", "master")
+	g.Exec("git", "checkout", "master")
 
 	return
 }
@@ -47,7 +49,8 @@ func TestClone(t *testing.T) {
 	defer os.RemoveAll(dir)
 	defer os.RemoveAll(origin)
 
-	cloneDir, cloneErr := Clone(origin)
+	g := Git("")
+	cloneDir, cloneErr := g.Clone(origin)
 	defer os.RemoveAll(cloneDir)
 
 	assert.Nil(t, cloneErr)
@@ -60,27 +63,109 @@ func TestClone(t *testing.T) {
 	assert.True(t, strings.HasSuffix(files[0], "file1.txt"), "file1.txt mush be the only file present")
 }
 
+func TestCloneAlreadyInit(t *testing.T) {
+	dir := tempDir()
+	defer os.RemoveAll(dir)
+
+	g := Git("/tmp/")
+	dir2, err := g.Clone("whatever")
+	assert.Empty(t, dir2)
+	assert.NotNil(t, err)
+}
+
+type TempDirFailSys struct{}
+
+func (c TempDirFailSys) Command(name string, arg ...string) *exec.Cmd {
+	return exec.Command(name, arg...)
+}
+func (c TempDirFailSys) TempDir(dir, prefix string) (string, error) {
+	return "", errors.New("Mock error")
+}
+
+func TestCloneMkTempDirFail(t *testing.T) {
+	dir := tempDir()
+	defer os.RemoveAll(dir)
+
+	g := Git("")
+	g.setSys(&TempDirFailSys{})
+	dir2, err := g.Clone("whatever")
+	assert.Empty(t, dir2)
+	assert.Equal(t, "Mock error", err.Error())
+}
+
+type CommandFailSys struct{}
+
+func (c CommandFailSys) Command(name string, arg ...string) *exec.Cmd {
+	return exec.Command("sdjadzejeuqsoieqomequfqomeuzj")
+}
+func (c CommandFailSys) TempDir(dir, prefix string) (string, error) {
+	return ioutil.TempDir(dir, prefix)
+}
+
+func TestCloneCommandFail(t *testing.T) {
+	dir := tempDir()
+	defer os.RemoveAll(dir)
+
+	g := Git("")
+	g.setSys(&CommandFailSys{})
+	dir2, err := g.Clone("whatever")
+	assert.Empty(t, dir2)
+	assert.NotNil(t, err)
+}
+
+type CommandWaitFailSys struct{}
+
+func (c CommandWaitFailSys) Command(name string, arg ...string) *exec.Cmd {
+	return exec.Command("sh", "-c", "sdjadzejeuqsoieqomequfqomeuzj")
+}
+func (c CommandWaitFailSys) TempDir(dir, prefix string) (string, error) {
+	return ioutil.TempDir(dir, prefix)
+}
+func TestCloneCommandWaitFail(t *testing.T) {
+	dir := tempDir()
+	defer os.RemoveAll(dir)
+
+	g := Git("")
+	g.setSys(&CommandWaitFailSys{})
+	dir2, err := g.Clone("whatever")
+	assert.Empty(t, dir2)
+	assert.NotNil(t, err)
+}
+
+
+func TestIsInstalled(t *testing.T) {
+	assert.True(t, Git("").IsInstalled())
+}
+
+func TestIsInstalledFail(t *testing.T) {
+	g := Git("")
+	g.setSys(&CommandFailSys{})
+	assert.False(t, g.IsInstalled())
+}
+
 func TestCommitAndPushInNewBranch(t *testing.T) {
 	dir, origin := makeRepo()
 	defer os.RemoveAll(dir)
 	defer os.RemoveAll(origin)
 
-	cloneDir, cloneErr := Clone(origin)
+	g := Git("")
+	cloneDir, cloneErr := g.Clone(origin)
 	if cloneErr != nil {
 		panic(cloneErr)
 	}
 	defer os.RemoveAll(cloneDir)
 
-	ExecCommand(cloneDir, "touch", "file3.txt")
-	CommitAndPushInNewBranch(cloneDir, "add-3", "Add an other file")
+	g.Exec("touch", "file3.txt")
+	g.CommitAndPushInNewBranch("add-3", "Add an other file")
 
-	cloneDirCheck, cloneErrCheck := Clone(origin)
+	gCheck := Git("")
+	cloneDirCheck, cloneErrCheck := gCheck.Clone(origin)
 	if cloneErrCheck != nil {
 		panic(cloneErrCheck)
 	}
 	defer os.RemoveAll(cloneDirCheck)
 
-	ExecCommand(cloneDirCheck, "git", "checkout", "add-3")
+	gCheck.Exec("git", "checkout", "add-3")
 	globPattern := filepath.Join(cloneDir, "*.txt")
 	files, err := filepath.Glob(globPattern)
 	if err != nil {
