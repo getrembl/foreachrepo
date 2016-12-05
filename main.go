@@ -17,7 +17,8 @@ foreachrepo -org transcovo -npm-dep chpr-metrics -npm-dep-ver 1.0.0` +
 `
 
 func main() {
-	if !git.IsGitInstalled() {
+	g := git.Git("")
+	if !g.IsInstalled() {
 		log.Fatal("git command not found")
 	}
 
@@ -74,7 +75,8 @@ func main() {
 
 func bump_npm_dependency(httpInterface *github.AuthHttpInterface, repo github.Repo, npmDep string, npmDepVersion string,
 branchName string, commitMessage string) string {
-	dir, err := git.Clone(repo.GitUrl)
+	g := git.Git("")
+	dir, err := g.Clone(repo.GitUrl)
 	if err != nil {
 		log.Println(repo.Name, " -> failed: ", err.Error())
 		return ""
@@ -83,7 +85,7 @@ branchName string, commitMessage string) string {
 
 	err = npm.UpdatePackage(dir, npmDep, npmDepVersion)
 	if err == nil {
-		err = git.CommitAndPushInNewBranch(dir, branchName, commitMessage)
+		err = g.CommitAndPushInNewBranch(branchName, commitMessage)
 		if err == nil {
 			url := github.CreatePullRequest(httpInterface, repo, branchName, commitMessage)
 
