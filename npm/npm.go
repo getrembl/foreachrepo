@@ -8,6 +8,7 @@ import (
 	"os"
 	"encoding/json"
 	"os/exec"
+	"log"
 )
 
 const SPACES = "\\s*"
@@ -151,45 +152,67 @@ func Exec(dir string, name string, elements ...string) error {
 	return nil
 }
 
-func ExecNpmList(dir string) (NpmListOutput, error) {
-	cmd := exec.Command("npm", "list", "--depth", "0", "--json")
+func ExecNpmList(dir string) (map[string]string, error) {
+	log.Print("Executing npm list")
+	cmd := exec.Command("bash", "-c", "source ~/.nvm/nvm.sh && nvm i 6 >/dev/null 2>&1 && npm i >/dev/null 2>&1 && npm list --depth 0 --json")
 	cmd.Dir = dir
-	stdout, err := cmd.StdoutPipe()
+
+	outPipe, err := cmd.StdoutPipe()
 	if err != nil {
+		log.Print("Npm list outPipe failed: ", err.Error())
 		return nil, err
 	}
-	if err := cmd.Start(); err != nil {
+
+	errPipe, err := cmd.StderrPipe()
+	if err != nil {
+		log.Print("Npm list errPipe failed: ", err.Error())
 		return nil, err
 	}
-	var result NpmListOutput
-	if err := json.NewDecoder(stdout).Decode(&result); err != nil {
+
+	err = cmd.Start()
+	if err != nil {
+		log.Print("Npm list Start failed: ", err.Error())
 		return nil, err
 	}
-	if err := cmd.Wait(); err != nil {
+
+
+	// pring std and err output after done, but before checking for success
+	outBytes, _ := ioutil.ReadAll(outPipe)
+	log.Print("Npm list done, bytes read: ", len(outBytes))
+
+	err = cmd.Wait()
+	if err != nil {
+		errBytes, _ := ioutil.ReadAll(errPipe)
+		log.Print("Npm list error output: <", string(errBytes), ">")
+		log.Print("Npm list failed: ", err.Error())
 		return nil, err
 	}
-	return result, nil
+
+	versions := ParseNpmListOutput(outBytes)
+	log.Print("Parsing successful, effective dependency versions: ", versions)
+	return versions, nil
 }
 
 func FreezePackage(dir string) error {
+	log.Print("Freezing dependencies in: ", dir)
 	packageFile := filepath.Join(dir, "package.json")
 	if !exists(packageFile) {
+		log.Print("No package.json found, aborting")
 		return &NoPackageJson{dir}
 	}
 	bytes, err := ioutil.ReadFile(packageFile)
 	if err != nil {
+		log.Print("Could not read package.json", err.Error())
 		return err
 	}
 	packageContent := string(bytes)
 
 	Exec(dir, "rm", "-rf", "node_modules")
-	Exec(dir, "npm", "i")
-	npmListOutput, err := ExecNpmList(dir)
+	Exec(dir, "bash", "-c", "nvm i 6 && npm i")
+	versions, err := ExecNpmList(dir)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	versions := ExtractVersions(npmListOutput)
 
 	updatedPackageContent, err := UpdateDependencies(packageContent, versions)
 	if err != nil {

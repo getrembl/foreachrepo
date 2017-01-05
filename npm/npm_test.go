@@ -6,9 +6,6 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"os"
-	"os/exec"
-	"log"
-	"encoding/json"
 )
 
 const SAMPLE_PACKAGE_CONTENT = `{
@@ -210,7 +207,7 @@ func TestFreezePackage(t *testing.T) {
 	if mkdir_err != nil {
 		panic(mkdir_err)
 	}
-	defer os.RemoveAll(dir)
+	//defer os.RemoveAll(dir)
 	packageFile := filepath.Join(dir, "package.json")
 	fileWriteErr := ioutil.WriteFile(packageFile, []byte(SAMPLE_PACKAGE_CONTENT), 0644)
 	if fileWriteErr != nil {
