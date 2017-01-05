@@ -32,6 +32,15 @@ func (D *DependencyNotFound) Error() string {
 	return "Dependency " + D.dependency + " not found in package.json"
 }
 
+type DependencyUpToDate struct {
+	packageContent string
+	dependency     string
+}
+
+func (D *DependencyUpToDate) Error() string {
+	return "Dependency " + D.dependency + " is already up to date"
+}
+
 type InvalidPackageJsonContent struct {
 	packageContent string
 	dependency     string
@@ -49,7 +58,9 @@ func ExtractVersions(data NpmListOutput) map[string]string {
 	result := make(map[string]string)
 	dependencies := data.Dependencies
 	for name, properties := range dependencies {
-		result[name] = properties["version"]
+		if version, ok := properties["version"]; ok {
+		    result[name] = version
+		}
 	}
 	return result
 }
@@ -84,6 +95,10 @@ func UpdateDependency(packageContent string, dependency string, version string) 
 		match := matches[0]
 		dependencyVersionStart := match[4]
 		dependencyVersionEnd := match[5]
+		currentVersion := packageContent[dependencyVersionStart:dependencyVersionEnd]
+		if currentVersion == version {
+			return "", &DependencyUpToDate{packageContent, dependency}
+		}
 		return packageContent[:dependencyVersionStart] + version + packageContent[dependencyVersionEnd:], nil
 	default:
 		return "", &InvalidPackageJsonContent{packageContent, dependency}
@@ -91,11 +106,19 @@ func UpdateDependency(packageContent string, dependency string, version string) 
 }
 
 func UpdateDependencies(packageContent string, updates map[string]string) (string, error) {
-	var err error
 	for name, version := range updates {
-		packageContent, err = UpdateDependency(packageContent, name, version)
-		if err != nil {
-			return "", err
+		newPackageContent, err := UpdateDependency(packageContent, name, version)
+		if err == nil {
+			packageContent = newPackageContent
+		} else {
+			switch t := err.(type) {
+			default:
+				return "", err
+			case *DependencyUpToDate:
+				log.Print("FYI: ", t.Error())
+			case *DependencyNotFound:
+				log.Print("FYI: ", t.Error())
+			}
 		}
 	}
 	return packageContent, nil
@@ -154,7 +177,7 @@ func Exec(dir string, name string, elements ...string) error {
 
 func ExecNpmList(dir string) (map[string]string, error) {
 	log.Print("Executing npm list")
-	cmd := exec.Command("bash", "-c", "source ~/.nvm/nvm.sh && nvm i 6 >/dev/null 2>&1 && npm i >/dev/null 2>&1 && npm list --depth 0 --json")
+	cmd := exec.Command("bash", "-c", "source ~/.nvm/nvm.sh && nvm i 6 >/dev/null && npm i >/dev/null && npm list --depth 0 --json || echo")
 	cmd.Dir = dir
 
 	outPipe, err := cmd.StdoutPipe()
@@ -178,12 +201,13 @@ func ExecNpmList(dir string) (map[string]string, error) {
 
 	// pring std and err output after done, but before checking for success
 	outBytes, _ := ioutil.ReadAll(outPipe)
-	log.Print("Npm list done, bytes read: ", len(outBytes))
+	log.Print("Npm list done: <", string(outBytes), ">")
+
+	errBytes, _ := ioutil.ReadAll(errPipe)
+	log.Print("Npm list error output: <", string(errBytes), ">")
 
 	err = cmd.Wait()
 	if err != nil {
-		errBytes, _ := ioutil.ReadAll(errPipe)
-		log.Print("Npm list error output: <", string(errBytes), ">")
 		log.Print("Npm list failed: ", err.Error())
 		return nil, err
 	}

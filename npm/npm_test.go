@@ -101,6 +101,15 @@ func TestUpdateDependencyNotFound(t *testing.T) {
 	assert.Contains(t, errMessage, "not found")
 }
 
+func TestGetUpdatedPackageContentUpToDate(t *testing.T) {
+	updated, err := UpdateDependency(SAMPLE_PACKAGE_CONTENT, "bunyan", "~1.8.1")
+	assert.Equal(t, "", updated)
+	assert.NotNil(t, err)
+	errMessage := err.Error()
+	assert.Contains(t, errMessage, "bunyan")
+	assert.Contains(t, errMessage, "up to date")
+}
+
 const EXPECTED_UPDATED_PACKAGE_CONTENT_MULTIPLE_DEPS = `{
   "name": "express-middleware",
   "version": "1.4.0",
@@ -147,6 +156,7 @@ func TestUpdateDependencies(t *testing.T) {
 		"bunyan": "1.8.2",
 		"chai": "3.5.0",
 		"eslint-config-cp": "transcovo/eslint-config-cp#1.1.0",
+		"not-in-package-dot-json": "1.0.0",
 	}
 	updated, err := UpdateDependencies(SAMPLE_PACKAGE_CONTENT, updates)
 	assert.Nil(t, err)
@@ -190,6 +200,21 @@ const SAMPLE_NPM_LIST_OUTPUT = `{
       "version": "1.5.0",
       "from": "express-middleware@>=1.3.2 <2.0.0",
       "resolved": "https://registry.npmjs.org/express-middleware/-/express-middleware-1.5.0.tgz"
+    },
+    "eslint-plugin-jsx-a11y": {
+      "required": {
+        "_id": "eslint-plugin-jsx-a11y@^2.1.0",
+        "name": "eslint-plugin-jsx-a11y",
+        "version": "^2.1.0",
+        "peerMissing": [
+          {
+            "requiredBy": "eslint-config-airbnb@10.0.1",
+            "requires": "eslint-plugin-jsx-a11y@^2.1.0"
+          }
+        ],
+        "dependencies": {}
+      },
+      "peerMissing": true
     }
   }
 }`
@@ -207,7 +232,7 @@ func TestFreezePackage(t *testing.T) {
 	if mkdir_err != nil {
 		panic(mkdir_err)
 	}
-	//defer os.RemoveAll(dir)
+	defer os.RemoveAll(dir)
 	packageFile := filepath.Join(dir, "package.json")
 	fileWriteErr := ioutil.WriteFile(packageFile, []byte(SAMPLE_PACKAGE_CONTENT), 0644)
 	if fileWriteErr != nil {
