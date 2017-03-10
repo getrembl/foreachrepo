@@ -66,7 +66,7 @@ The branch name will be `fixed-chpr-metrics-version` and the commit message will
 ```
 foreachrepo -org transcovo \
             -npm-dep chpr-metrics \
-            -npm-dep-ver 1.0.0` \
+            -npm-dep-ver 1.0.0 \
             -branch fixed-chpr-metrics-version \
             -message "TECH Use fixed version for chpr-metrics"
 ```
