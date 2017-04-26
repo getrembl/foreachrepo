@@ -8,12 +8,20 @@ import (
 	"github.com/transcovo/foreachrepo/npm"
 	"github.com/transcovo/foreachrepo/github"
 	"strings"
+	"github.com/transcovo/foreachrepo/tasks"
 )
 
-const EXAMPLE = `. Example:
+const EXAMPLES = `. Examples:
 
-foreachrepo -org transcovo -npm-dep chpr-metrics -npm-dep-ver 1.0.0` +
+Bump a single npm dependency to a specific version in all repos:
+
+$> foreachrepo -task BUMP -org transcovo -npm-dep chpr-metrics -npm-dep-ver 1.0.0` +
 	` -branch fixed-chpr-metrics-version -message "TECH Use fixed version for chpr-metrics"
+
+Freeze all package.json dependencies to the current exact version of the current result of npm intall
+
+$> foreachrepo -task FREEZE -org transcovo` +
+	` -branch freeze-all-deps -message "TECH Freeze all dependencies to the current result of npm i"
 `
 
 func main() {
@@ -32,28 +40,48 @@ func main() {
 		log.Fatalln("Missing environement variable GITHUB_PASSWORD")
 	}
 
-	organization := flag.String("org", "REQUIRED", "The organization to scan")
-	npmDep := flag.String("npm-dep", "REQUIRED", "The npm dependency to update")
-	npmDepVersion := flag.String("npm-dep-ver", "REQUIRED", "The new version to apply everywhere")
-	branchName := flag.String("branch", "REQUIRED", "The branch name to use")
-	commitMessage := flag.String("message", "REQUIRED", "The commit message to use")
+	// generic, mandatory
+	taskName := flag.String("task", "DEFAULT", "The task to execute")
+	organization := flag.String("org", "DEFAULT", "The organization to scan")
+	branchName := flag.String("branch", "DEFAULT", "The branch name to use")
+	commitMessage := flag.String("message", "DEFAULT", "The commit message to use")
+
+	// for bumping single dependency parameter
+	npmDep := flag.String("npm-dep", "DEFAULT", "The npm dependency to update")
+	npmDepVersion := flag.String("npm-dep-ver", "DEFAULT", "The new version to apply everywhere")
 
 	flag.Parse()
 
-	if *organization == "REQUIRED" {
-		log.Fatalln("organization flag required", EXAMPLE)
+	if *organization == "DEFAULT" {
+		log.Fatalln("organization flag required", EXAMPLES)
 	}
-	if *npmDep == "REQUIRED" {
-		log.Fatalln("npmDep flag required", EXAMPLE)
+	if *taskName == "DEFAULT" {
+		log.Fatalln("task flag required", EXAMPLES)
 	}
-	if *npmDepVersion == "REQUIRED" {
-		log.Fatalln("npmDepVersion flag required", EXAMPLE)
+	if *branchName == "DEFAULT" {
+		log.Fatalln("branch-name flag required", EXAMPLES)
 	}
-	if *branchName == "REQUIRED" {
-		log.Fatalln("branchName flag required", EXAMPLE)
+	if *commitMessage == "DEFAULT" {
+		log.Fatalln("commit-message flag required", EXAMPLES)
 	}
-	if *commitMessage == "REQUIRED" {
-		log.Fatalln("commitMessage flag required", EXAMPLE)
+
+	var task tasks.Task
+
+	if *taskName == "BUMP" {
+		if *npmDep == "DEFAULT" {
+			log.Fatalln("npm-dep flag required when task is BUMP", EXAMPLES)
+		}
+		if *npmDepVersion == "DEFAULT" {
+			log.Fatalln("npm-dep-version flag required when task is BUMP", EXAMPLES)
+		}
+		task = BumpNpmDependencyTask{
+			npmDep:*npmDep,
+			npmDepVersion:*npmDepVersion,
+		}
+	} else if *taskName == "FREEZE" {
+		task = FreezeTask{}
+	} else {
+		log.Fatalln("Unknown task type ", *taskName, EXAMPLES)
 	}
 
 	httpInterface := &github.AuthHttpInterface{githubUsername, githubPassword}
@@ -64,7 +92,7 @@ func main() {
 	}
 	urls := []string{}
 	for _, repo := range repos {
-		url := bump_npm_dependency(httpInterface, repo, *npmDep, *npmDepVersion, *branchName, *commitMessage)
+		url := tasks.ExecuteTask(httpInterface, repo, task, *branchName, *commitMessage)
 		if url != "" {
 			urls = append(urls, url)
 		}
@@ -73,30 +101,17 @@ func main() {
 	println(strings.Join(urls, "\n"))
 }
 
-func bump_npm_dependency(httpInterface *github.AuthHttpInterface, repo github.Repo, npmDep string, npmDepVersion string,
-branchName string, commitMessage string) string {
-	g := git.Git("")
-	dir, err := g.Clone(repo.GitUrl)
-	if err != nil {
-		log.Println(repo.Name, " -> failed: ", err.Error())
-		return ""
-	}
-	defer os.RemoveAll(dir)
+type BumpNpmDependencyTask struct {
+	npmDep        string
+	npmDepVersion string
+}
 
-	err = npm.UpdatePackage(dir, npmDep, npmDepVersion)
-	if err == nil {
-		err = g.CommitAndPushInNewBranch(branchName, commitMessage)
-		if err == nil {
-			url := github.CreatePullRequest(httpInterface, repo, branchName, commitMessage)
+func (t BumpNpmDependencyTask) Execute(dir string) error {
+	return npm.UpdatePackage(dir, t.npmDep, t.npmDepVersion)
+}
 
-			log.Println(repo.Name, " -> done! (", url, ")")
-			return url
-		}
+type FreezeTask struct{}
 
-		log.Println(repo.Name, " -> failed: ", err.Error())
-		return ""
-	}
-
-	log.Println(repo.Name, " -> skip: ", err.Error())
-	return ""
+func (t FreezeTask) Execute(dir string) error {
+	return npm.FreezePackage(dir)
 }
