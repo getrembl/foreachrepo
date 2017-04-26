@@ -9,6 +9,7 @@ import (
 	"log"
 	"bytes"
 	"errors"
+	"io/ioutil"
 )
 
 type GitUserConfig struct {
@@ -59,6 +60,11 @@ func getJson(httpGetter HttpGetter, url string, target interface{}) error {
 		return err
 	}
 	defer r.Body.Close()
+
+	if r.StatusCode != 200 {
+		detail, _ := ioutil.ReadAll(r.Body)
+		panic("Non 200 return code: " + strconv.Itoa(r.StatusCode) + " (" + string(detail) + ")")
+	}
 
 	return json.NewDecoder(r.Body).Decode(target)
 }
